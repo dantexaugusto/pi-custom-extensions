@@ -43,6 +43,9 @@ This repo contains custom implementations of all of the above.
 │   ├── is.md                 # /is — GitHub issue analysis
 │   ├── cl.md                 # /cl — changelog audit
 │   └── wr.md                 # /wr — wrap up task (changelog, commit, push)
+├── skills/                   # Skills (on-demand reference for the LLM)
+│   └── squad-workflows/
+│       └── SKILL.md          # Squad agent and workflow reference
 └── install.sh                # Deploy script for global pi installation
 ```
 

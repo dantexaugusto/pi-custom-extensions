@@ -426,6 +426,14 @@ export default function (pi: ExtensionAPI) {
 			"- Review: single reviewer agent",
 			"- Full: chain scout -> planner -> parallel(frontend, backend) -> tester -> reviewer",
 		].join(" "),
+		promptGuidelines: [
+			"Use the squad tool to delegate complex tasks to specialized agents instead of doing everything yourself.",
+			"For features or large changes: chain scout → planner → parallel(frontend, backend) → reviewer.",
+			"For quick fixes: use a single frontend or backend agent directly.",
+			"For code review: use a single reviewer agent, or the /review prompt template.",
+			"For tests: chain scout → tester, or use the /test prompt template.",
+			"Prompt templates /feature, /fullstack, /implement-review, /review, and /test orchestrate squad workflows automatically.",
+		],
 		parameters: SquadParams,
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {

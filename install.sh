@@ -19,7 +19,12 @@ cp "${SCRIPT_DIR}/agents/"*.md "${PI_DIR}/agents/"
 mkdir -p "${PI_DIR}/prompts"
 cp "${SCRIPT_DIR}/prompts/"*.md "${PI_DIR}/prompts/"
 
+# Skills
+mkdir -p "${PI_DIR}/skills"
+cp -r "${SCRIPT_DIR}/skills/"* "${PI_DIR}/skills/"
+
 echo "Done. Installed:"
 echo "  Extensions → ${PI_DIR}/extensions/"
 echo "  Agents     → ${PI_DIR}/agents/"
 echo "  Prompts    → ${PI_DIR}/prompts/"
+echo "  Skills     → ${PI_DIR}/skills/"
