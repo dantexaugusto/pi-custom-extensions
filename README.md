@@ -16,7 +16,6 @@ This repo contains custom implementations of all of the above.
 ## Contents
 
 ```
-.pi/
 ├── extensions/
 │   ├── files.ts              # /files command — browse session files
 │   ├── web-search.ts         # web_search + web_fetch tools
@@ -34,16 +33,17 @@ This repo contains custom implementations of all of the above.
 │   ├── backend.md
 │   ├── tester.md
 │   └── reviewer.md
-└── prompts/                  # Prompt templates
-    ├── feature.md            # /feature — full feature workflow
-    ├── fullstack.md          # /fullstack — parallel frontend+backend
-    ├── implement-review.md   # /implement-review — implement, review, fix
-    ├── review.md             # /review — code review
-    ├── test.md               # /test — write tests
-    ├── pr.md                 # /pr — structured PR review
-    ├── is.md                 # /is — GitHub issue analysis
-    ├── cl.md                 # /cl — changelog audit
-    └── wr.md                 # /wr — wrap up task (changelog, commit, push)
+├── prompts/                  # Prompt templates
+│   ├── feature.md            # /feature — full feature workflow
+│   ├── fullstack.md          # /fullstack — parallel frontend+backend
+│   ├── implement-review.md   # /implement-review — implement, review, fix
+│   ├── review.md             # /review — code review
+│   ├── test.md               # /test — write tests
+│   ├── pr.md                 # /pr — structured PR review
+│   ├── is.md                 # /is — GitHub issue analysis
+│   ├── cl.md                 # /cl — changelog audit
+│   └── wr.md                 # /wr — wrap up task (changelog, commit, push)
+└── install.sh                # Deploy script for global pi installation
 ```
 
 ## Extensions
@@ -123,32 +123,26 @@ Prompt templates are invoked in pi via `/template-name`. They orchestrate the sq
 
 ## Installation
 
-### Option 1: Copy to your project
+### Option 1: Install globally (recommended)
 
-Copy the `.pi/` directory to the root of any project where you use pi:
+Clone the repo and run the install script:
 
 ```bash
-cp -r .pi/ /path/to/your/project/.pi/
+git clone <repo-url> pi-custom-extensions
+cd pi-custom-extensions
+./install.sh
 ```
 
-Extensions, agents, and prompts in `.pi/` are auto-discovered by pi when you run it from that directory.
+This copies all extensions, agents, and prompts to `~/.pi/agent/` where pi auto-discovers them globally.
 
-### Option 2: Install globally
+### Option 2: Copy to your project
 
-Copy to your global pi config directory for use across all projects:
+Copy the directories into your project's `.pi/` folder:
 
 ```bash
-# Extensions
-cp .pi/extensions/*.ts ~/.pi/agent/extensions/
-cp -r .pi/extensions/squad ~/.pi/agent/extensions/
-
-# Agents
-mkdir -p ~/.pi/agent/agents
-cp .pi/agents/*.md ~/.pi/agent/agents/
-
-# Prompts
-mkdir -p ~/.pi/agent/prompts
-cp .pi/prompts/*.md ~/.pi/agent/prompts/
+cp -r extensions/ /path/to/your/project/.pi/extensions/
+cp -r agents/ /path/to/your/project/.pi/agents/
+cp -r prompts/ /path/to/your/project/.pi/prompts/
 ```
 
 ### Option 3: Reference via settings.json
@@ -158,10 +152,10 @@ Point pi to this repo's extensions in your project or global `settings.json`:
 ```json
 {
   "extensions": [
-    "/path/to/this-repo/.pi/extensions/files.ts",
-    "/path/to/this-repo/.pi/extensions/web-search.ts",
-    "/path/to/this-repo/.pi/extensions/diff.ts",
-    "/path/to/this-repo/.pi/extensions/squad"
+    "/path/to/this-repo/extensions/files.ts",
+    "/path/to/this-repo/extensions/web-search.ts",
+    "/path/to/this-repo/extensions/diff.ts",
+    "/path/to/this-repo/extensions/squad"
   ]
 }
 ```
@@ -173,7 +167,7 @@ Settings file locations:
 ### Option 4: Load individual extensions on the fly
 
 ```bash
-pi -e /path/to/this-repo/.pi/extensions/web-search.ts
+pi -e /path/to/this-repo/extensions/web-search.ts
 ```
 
 ## Requirements
