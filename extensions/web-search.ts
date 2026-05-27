@@ -18,12 +18,31 @@ interface SearchResult {
 	snippet: string;
 }
 
+import fs from "fs";
+import path from "path";
+
+function getSecretValue(envVarName: string): string | undefined {
+	// First check environment variables
+	if (process.env[envVarName]) return process.env[envVarName];
+	
+	// Then try reading from the global user secrets
+	try {
+        const secretPath = path.join("/home/ubuntu/.secrets", envVarName);
+		if (fs.existsSync(secretPath)) {
+			return fs.readFileSync(secretPath, "utf-8").trim();
+		}
+	} catch (e) {
+		// Ignore file read errors
+	}
+	return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Search backends
 // ---------------------------------------------------------------------------
 
 async function searchTavily(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResult[]> {
-	const apiKey = process.env.TAVILY_API_KEY;
+	const apiKey = getSecretValue("TAVILY_API_KEY");
 	if (!apiKey) throw new Error("TAVILY_API_KEY not set");
 
 	const res = await fetch("https://api.tavily.com/search", {
@@ -48,7 +67,7 @@ async function searchTavily(query: string, maxResults: number, signal?: AbortSig
 }
 
 async function searchBrave(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResult[]> {
-	const apiKey = process.env.BRAVE_API_KEY;
+	const apiKey = getSecretValue("BRAVE_API_KEY");
 	if (!apiKey) throw new Error("BRAVE_API_KEY not set");
 
 	const params = new URLSearchParams({ q: query, count: String(maxResults) });
@@ -67,7 +86,7 @@ async function searchBrave(query: string, maxResults: number, signal?: AbortSign
 }
 
 async function searchSerp(query: string, maxResults: number, signal?: AbortSignal): Promise<SearchResult[]> {
-	const apiKey = process.env.SERP_API_KEY;
+	const apiKey = getSecretValue("SERP_API_KEY");
 	if (!apiKey) throw new Error("SERP_API_KEY not set");
 
 	const params = new URLSearchParams({ q: query, api_key: apiKey, num: String(maxResults), engine: "google" });
@@ -83,9 +102,9 @@ async function searchSerp(query: string, maxResults: number, signal?: AbortSigna
 }
 
 function getSearchBackend(): { name: string; fn: typeof searchTavily } | null {
-	if (process.env.TAVILY_API_KEY) return { name: "Tavily", fn: searchTavily };
-	if (process.env.BRAVE_API_KEY) return { name: "Brave", fn: searchBrave };
-	if (process.env.SERP_API_KEY) return { name: "SerpAPI", fn: searchSerp };
+	if (getSecretValue("TAVILY_API_KEY")) return { name: "Tavily", fn: searchTavily };
+	if (getSecretValue("BRAVE_API_KEY")) return { name: "Brave", fn: searchBrave };
+	if (getSecretValue("SERP_API_KEY")) return { name: "SerpAPI", fn: searchSerp };
 	return null;
 }
 
