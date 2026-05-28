@@ -89,27 +89,30 @@ This group registers the `/files`, `/diff`, `/tui` commands and the `squad` tool
 * **Orchestration Tool**: `squad`
 * **Workflow Templates**: `/feature`, `/fullstack`, `/implement-review`, `/review`, `/test`, `/pr`, `/is`, `/cl`, `/wr`
 * **Agent Rosters**:
-  | Agent | Model | Description |
+  | Agent | Default Model / Fallback | Description |
   |-------|-------|-------------|
-  | scout | Haiku (fast) | Codebase recon — finds relevant code and returns structured context |
-  | planner | Sonnet | Creates implementation plans from context and requirements |
-  | frontend | Sonnet | React, CSS, HTML, responsive design, accessibility |
-  | backend | Sonnet | APIs, databases, server logic, authentication |
-  | tester | Sonnet | Unit, integration, and e2e tests |
-  | reviewer | Sonnet | Code review for quality, security, and performance |
+  | scout | Active Session / Haiku | Codebase recon — finds relevant code and returns structured context |
+  | planner | Active Session / Sonnet | Creates implementation plans from context and requirements |
+  | frontend | Active Session / Sonnet | React, CSS, HTML, responsive design, accessibility |
+  | backend | Active Session / Sonnet | APIs, databases, server logic, authentication |
+  | tester | Active Session / Sonnet | Unit, integration, and e2e tests |
+  | reviewer | Active Session / Sonnet | Code review for quality, security, and performance |
+
+> [!NOTE]
+> The classic V1 agents do not define explicit models in their markdown frontmatter, meaning they default dynamically to the active session model of the parent `pi` instance.
 
 ### 2. `subagents_OpenRouter_multimodel` (OpenRouter Optimized)
-This group is tailored for OpenRouter multi-model architectures.
+This group is tailored for OpenRouter multi-model architectures, where each agent uses a dedicated, explicit model defined in its frontmatter to optimize task-specific costs and capabilities.
 
 * **Orchestration Tool**: `subagent`
 * **Agent Rosters**:
-  | Agent | Description |
-  |-------|-------------|
-  | scout | Finds relevant code and returns structured context |
-  | planner | Prepares implementation plans |
-  | worker | Implements full stack backend and frontend tasks |
-  | tester | Authors test configurations and sweeps |
-  | reviewer | Performs structured code and style review |
+  | Agent | Configured Model | Description |
+  |-------|-------|-------------|
+  | scout | `openrouter/deepseek/deepseek-chat` | Codebase recon — finds relevant code and returns compressed context |
+  | planner | `openrouter/moonshot/kimi-k2.6` | Prepares implementation plans |
+  | worker | `openai/gpt-5.2-codex` | Implements full stack backend and frontend tasks |
+  | tester | `openrouter/google/gemini-3-flash-preview` | Authors test configurations and sweeps |
+  | reviewer | `google/gemini-2.5-flash` | Performs structured code and style review |
 
 ---
 
