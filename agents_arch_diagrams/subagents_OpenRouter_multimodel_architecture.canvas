@@ -1,0 +1,142 @@
+{
+  "nodes": [
+    {
+      "id": "header",
+      "type": "text",
+      "text": "# Multi-Model OpenRouter Architecture\n*Optimized multi-LLM orchestration leveraging specialized task-specific OpenRouter models.*",
+      "x": 0,
+      "y": -200,
+      "width": 600,
+      "height": 100,
+      "color": "1"
+    },
+    {
+      "id": "input",
+      "type": "text",
+      "text": "### 📥 User Goal\nTriggered via the `subagent` tool (supporting single, parallel, or chain modes).",
+      "x": 200,
+      "y": 0,
+      "width": 200,
+      "height": 100,
+      "color": "2"
+    },
+    {
+      "id": "scout",
+      "type": "text",
+      "text": "### 🔍 Scout Agent (Series)\n**Model:** `openrouter/deepseek/deepseek-chat`\n* **Role:** Highly cost-efficient large-scale codebase scanning and indexing.",
+      "x": 200,
+      "y": 180,
+      "width": 200,
+      "height": 140,
+      "color": "6"
+    },
+    {
+      "id": "planner",
+      "type": "text",
+      "text": "### 📋 Planner Agent (Series)\n**Model:** `openrouter/moonshot/kimi-k2.6`\n* **Role:** Intelligent design and generation of highly specific technical steps.",
+      "x": 200,
+      "y": 380,
+      "width": 200,
+      "height": 140,
+      "color": "4"
+    },
+    {
+      "id": "worker",
+      "type": "text",
+      "text": "### 🛠️ Worker Agent (Parallel)\n**Model:** `openai/gpt-5.2-codex`\n* **Role:** High-end code synthesis, writing frontend and backend changes.",
+      "x": 50,
+      "y": 580,
+      "width": 200,
+      "height": 140,
+      "color": "1"
+    },
+    {
+      "id": "tester",
+      "type": "text",
+      "text": "### 🧪 Tester Agent (Parallel)\n**Model:** `openrouter/google/gemini-3-flash-preview`\n* **Role:** Rapid test creation, running tests, and checking coverage.",
+      "x": 350,
+      "y": 580,
+      "width": 200,
+      "height": 140,
+      "color": "5"
+    },
+    {
+      "id": "reviewer",
+      "type": "text",
+      "text": "### 🛡️ Reviewer Agent (Series)\n**Model:** `google/gemini-2.5-flash`\n* **Role:** Rigorous verification and styling review of the changes.",
+      "x": 200,
+      "y": 780,
+      "width": 200,
+      "height": 140,
+      "color": "2"
+    },
+    {
+      "id": "output",
+      "type": "text",
+      "text": "### 📤 Verified Deliverable\nTested, reviewed, and finalized feature branch.",
+      "x": 200,
+      "y": 980,
+      "width": 200,
+      "height": 100,
+      "color": "3"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "fromNode": "input",
+      "fromSide": "bottom",
+      "toNode": "scout",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-2",
+      "fromNode": "scout",
+      "fromSide": "bottom",
+      "toNode": "planner",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-3a",
+      "fromNode": "planner",
+      "fromSide": "bottom",
+      "toNode": "worker",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-3b",
+      "fromNode": "planner",
+      "fromSide": "bottom",
+      "toNode": "tester",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-4a",
+      "fromNode": "worker",
+      "fromSide": "bottom",
+      "toNode": "reviewer",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-4b",
+      "fromNode": "tester",
+      "fromSide": "bottom",
+      "toNode": "reviewer",
+      "toSide": "top",
+      "toEnd": "arrow"
+    },
+    {
+      "id": "edge-5",
+      "fromNode": "reviewer",
+      "fromSide": "bottom",
+      "toNode": "output",
+      "toSide": "top",
+      "toEnd": "arrow"
+    }
+  ]
+}

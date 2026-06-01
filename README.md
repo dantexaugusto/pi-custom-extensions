@@ -20,9 +20,13 @@ A collection of custom extensions, specialized agents, prompt templates, and wor
 
 ## Directory Structure
 
-This repository is organized into independent **Agent Groups**:
+This repository is organized into independent **Agent Groups** and architecture diagrams:
 
 ```
+├── agents_arch_diagrams/            # Architecture diagrams (Obsidian Canvas format)
+│   ├── subagentsV1_architecture.canvas
+│   └── subagents_OpenRouter_multimodel_architecture.canvas
+│
 ├── subagentsV1/                     # V1 Agent Group (Core / Classic setup)
 │   ├── extensions/
 │   │   ├── files.ts                 # /files command — browse session files
