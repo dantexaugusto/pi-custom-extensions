@@ -65,12 +65,13 @@ This repository is organized into independent **Agent Groups** and architecture 
 │   │   └── subagent/                # Specialized subagent orchestrator (subagent tool)
 │   │       ├── index.ts
 │   │       └── agents.ts
-│   └── agents/                      # Agent profiles for OpenRouter
-│       ├── scout.md
-│       ├── planner.md
-│       ├── worker.md
-│       ├── tester.md
-│       └── reviewer.md
+│   ├── agents/                      # Agent profiles for OpenRouter
+│   │   ├── scout.md
+│   │   ├── planner.md
+│   │   ├── worker.md
+│   │   ├── tester.md
+│   │   └── reviewer.md
+│   └── install.sh                   # Dynamic deploy script for OpenRouter group
 ```
 
 ---
@@ -128,7 +129,13 @@ To deploy the **`subagentsV1`** classic group globally:
 ```bash
 ./subagentsV1/install.sh
 ```
-This dynamically copies V1 extensions, agents, prompts, and skills to your global `~/.pi/agent/` directory, where Pi will auto-discover them.
+This dynamically copies V1 extensions, agents, prompts, and skills to your global `~/.pi/agent/` directory.
+
+To deploy the **`subagents_OpenRouter_multimodel`** group globally:
+```bash
+./subagents_OpenRouter_multimodel/install.sh
+```
+This dynamically copies the OpenRouter subagent orchestrator and multi-model agent profiles to your global `~/.pi/agent/` directory.
 
 ### Option 2: Copy to your project local directory
 
