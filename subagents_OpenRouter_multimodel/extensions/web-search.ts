@@ -24,10 +24,10 @@ import path from "path";
 function getSecretValue(envVarName: string): string | undefined {
 	// First check environment variables
 	if (process.env[envVarName]) return process.env[envVarName];
-	
+
 	// Then try reading from the global user secrets
 	try {
-        const secretPath = path.join("/home/ubuntu/.secrets", envVarName);
+		const secretPath = path.join("/home/ubuntu/.secrets", envVarName);
 		if (fs.existsSync(secretPath)) {
 			return fs.readFileSync(secretPath, "utf-8").trim();
 		}
