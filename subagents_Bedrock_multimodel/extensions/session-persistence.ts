@@ -345,21 +345,17 @@ export default function sessionPersistenceExtension(pi: ExtensionAPI) {
 		}
 	});
 
-	// Register commands for querying history (TEMPORARILY DISABLED - causing autocomplete crash)
-	// TODO: Fix command registration causing TypeError in autocomplete
-	/*
+	// Register commands for querying history
 	pi.registerCommand?.({
 		name: "search-history",
-		description: "Search conversation history by content",
-		parameters: {
-			query: { type: "string", description: "Search query" },
-			limit: { type: "number", description: "Max results", default: 10 },
-		},
+		description: "Search conversation history. Usage: /search-history query",
 		async execute(args, ctx) {
 			if (!currentDb) return { error: "No active database" };
 
 			try {
-				const results = await currentDb.searchContext(args.query, args.limit);
+				// Parse query from args
+				const query = args?._ || args?.query || String(args);
+				const results = await currentDb.searchContext(query, 10);
 				return { results };
 			} catch (err) {
 				return { error: `Search failed: ${err}` };
@@ -381,6 +377,4 @@ export default function sessionPersistenceExtension(pi: ExtensionAPI) {
 			}
 		},
 	});
-	*/
-	console.log("[session-persistence] Commands temporarily disabled due to autocomplete bug");
 }
