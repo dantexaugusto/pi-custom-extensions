@@ -1,14 +1,11 @@
 /**
  * Subagent Cost Tracker Widget - Persist usage and cost statistics across sessions
  * 
- * Displays a dashboard showing:
- * - Total cost per agent
- * - Total tokens (input/output) per agent
- * - Number of invocations per agent
- * - Session totals
+ * FIXED: Command registration moved to session_start (was causing autocomplete crash)
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 
 interface SubagentUsage {
@@ -30,7 +27,6 @@ interface SessionStats {
 }
 
 const WIDGET_NAME = "subagent-cost-tracker";
-const STORAGE_KEY = "subagent-cost-stats";
 
 function formatTokens(count: number): string {
 	if (count < 1000) return count.toString();
@@ -93,12 +89,9 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		stats.agents.set(agent, existing);
 		stats.totalCost += usage.cost || 0;
 		stats.totalInvocations++;
-
-		// Trigger widget update
-		updateWidget();
 	};
 
-	const renderWidget = (_tui: any, theme: any) => {
+	const renderWidget = (_tui: unknown, theme: Theme) => {
 		const lines: string[] = [];
 
 		// Header
@@ -150,12 +143,32 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		return container;
 	};
 
-	const updateWidget = () => {
-		pi.getActiveContext()?.then((ctx: ExtensionContext | undefined) => {
-			if (!ctx?.hasUI) return;
-			ctx.ui.setWidget(WIDGET_NAME, renderWidget);
-		}).catch(() => {});
-	};
+	// FIXED: All UI operations moved into session_start handlers
+	// This prevents autocomplete crash (TypeError: value.startsWith)
+	pi.on("session_start", async (_event, ctx) => {
+		if (!ctx.hasUI) return;
+		
+		// ✅ SAFE: Register command AFTER session_start
+		// Format: pi.registerCommand("name", { description, handler })
+		pi.registerCommand?.("toggle-cost-widget", {
+			description: "Toggle the subagent cost tracker widget",
+			handler: async (_args, cmdCtx) => {
+				cmdCtx.ui.notify?.("Cost widget active", "info");
+			},
+		});
+
+		// Reset stats for new session
+		stats.agents.clear();
+		stats.totalCost = 0;
+		stats.totalInvocations = 0;
+		stats.startTime = new Date().toISOString();
+		
+		// Initialize widget
+		ctx.ui.setWidget(WIDGET_NAME, renderWidget);
+		
+		// Set status line
+		ctx.ui.setStatus("subagent-cost", ctx.ui.theme.fg("dim", "💰 $0.00"));
+	});
 
 	// Listen for subagent tool results
 	pi.on("tool_result_end", (event, ctx) => {
@@ -177,34 +190,19 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 				cost: r.usage?.cost || 0,
 			});
 		}
+		
+		// Update widget using ctx from event
+		ctx.ui.setWidget(WIDGET_NAME, renderWidget);
+		
+		// Update status line
+		ctx.ui.setStatus("subagent-cost", ctx.ui.theme.fg("accent", `💰 ${formatCost(stats.totalCost)}`));
 	});
 
 	// Clear widget when session ends
 	pi.on("session_end", (_event, ctx) => {
 		if (!ctx.hasUI) return;
+		
 		ctx.ui.setWidget(WIDGET_NAME, undefined);
-	});
-
-	// Initialize widget on session start
-	pi.on("session_start", (_event, ctx) => {
-		if (!ctx.hasUI) return;
-		
-		// Reset stats for new session
-		stats.agents.clear();
-		stats.totalCost = 0;
-		stats.totalInvocations = 0;
-		stats.startTime = new Date().toISOString();
-		
-		ctx.ui.setWidget(WIDGET_NAME, renderWidget);
-	});
-
-	// Register command to show/hide widget
-	pi.registerCommand?.({
-		name: "toggle-cost-widget",
-		description: "Toggle the subagent cost tracker widget",
-		execute: (_ctx) => {
-			updateWidget();
-			return { success: true };
-		},
+		ctx.ui.setStatus("subagent-cost", undefined);
 	});
 }
