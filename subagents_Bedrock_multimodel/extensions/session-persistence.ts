@@ -345,49 +345,9 @@ export default function sessionPersistenceExtension(pi: ExtensionAPI) {
 		}
 	});
 
-	// Register commands for querying history
-	pi.registerCommand?.("search-history", {
-		description: "Search conversation history: /search-history <query>",
-		handler: async (args: string, ctx) => {
-			if (!currentDb) {
-				ctx.ui.notify?.("No active database", "error");
-				return;
-			}
-
-			try {
-				const query = args.trim();
-				if (!query) {
-					ctx.ui.notify?.("Usage: /search-history <query>", "warning");
-					return;
-				}
-				const results = await currentDb.searchContext(query, 10);
-				ctx.ui.notify?.(`Found ${results.length} results`, "info");
-				return { results };
-			} catch (err) {
-				ctx.ui.notify?.(`Search failed: ${err}`, "error");
-				return { error: String(err) };
-			}
-		},
-	});
-
-	pi.registerCommand?.("list-sessions", {
-		description: "List all saved sessions",
-		handler: async (_args: string, ctx) => {
-			if (!currentDb) {
-				ctx.ui.notify?.("No active database", "error");
-				return;
-			}
-
-			try {
-				const sessions = await currentDb.getAllSessions();
-				ctx.ui.notify?.(`Found ${sessions.length} sessions`, "info");
-				return { sessions };
-			} catch (err) {
-				ctx.ui.notify?.(`Failed to list: ${err}`, "error");
-				return { error: String(err) };
-			}
-		},
-	});
-
-	console.log("[session-persistence] Commands registered: /search-history, /list-sessions");
+	// Commands DISABLED - causing autocomplete crash in user's session
+	// Error: TypeError: value.startsUnder is not a function
+	// Location: editor.js:1788 in getBestAutocompleteMatchIndex
+	// Need deeper investigation into Pi's autocomplete system
+	console.log("[session-persistence] Extension loaded (persistence only, no commands)");
 }
