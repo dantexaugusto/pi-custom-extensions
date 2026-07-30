@@ -9,7 +9,7 @@
  * - Searchable history with full-text search
  * - Context restoration on session resume
  * - Metadata tracking (cost, tokens, timestamp)
- * - Per-project database
+ * - Global database (shared across all projects)
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -38,20 +38,22 @@ interface SearchResult {
 	relevance: number;
 }
 
-const DB_DIR = ".pi/session-db";
+const DB_DIR = ".pi/agent/session-db";
 const DB_FILENAME = "history.db";
 
 class SessionDatabase {
 	private dbPath: string;
 	private sqlitePath: string;
 
-	constructor(projectPath: string) {
-		const dbDir = path.join(projectPath, DB_DIR);
+	constructor() {
+		// Use global database in ~/.pi/agent/session-db/
+		const homeDir = process.env.HOME || process.env.USERPROFILE || "/tmp";
+		const dbDir = path.join(homeDir, DB_DIR);
 		if (!fs.existsSync(dbDir)) {
 			fs.mkdirSync(dbDir, { recursive: true });
 		}
 		this.dbPath = path.join(dbDir, DB_FILENAME);
-		this.sqlitePath = "sqlite3"; // Assume sqlite3 is in PATH
+		this.sqlitePath = "sqlite3";
 	}
 
 	async init(): Promise<void> {
@@ -213,13 +215,13 @@ class SessionDatabase {
 		return this.parseResults(result);
 	}
 
-	async createSession(sessionId: string, name: string, projectPath: string): Promise<void> {
+	async createSession(sessionId: string, name: string, cwd: string): Promise<void> {
 		const timestamp = new Date().toISOString();
 		const escapedName = name.replace(/'/g, "''");
 
 		const sql = `
 			INSERT OR REPLACE INTO sessions (id, name, created_at, last_modified, project_path, total_cost, total_tokens)
-			VALUES ('${sessionId}', '${escapedName}', '${timestamp}', '${timestamp}', '${projectPath}', 0, 0);
+			VALUES ('${sessionId}', '${escapedName}', '${timestamp}', '${timestamp}', '${cwd}', 0, 0);
 		`;
 
 		await this.execSql(sql);
@@ -250,14 +252,14 @@ class SessionDatabase {
 	}
 }
 
-// Global database instance per project
-const dbInstances = new Map<string, SessionDatabase>();
+// Global database instance
+let dbInstance: SessionDatabase | null = null;
 
-function getDatabase(projectPath: string): SessionDatabase {
-	if (!dbInstances.has(projectPath)) {
-		dbInstances.set(projectPath, new SessionDatabase(projectPath));
+function getDatabase(): SessionDatabase {
+	if (!dbInstance) {
+		dbInstance = new SessionDatabase();
 	}
-	return dbInstances.get(projectPath)!;
+	return dbInstance;
 }
 
 function extractTextContent(content: string | { type: string; text?: string }[]): string {
@@ -279,7 +281,7 @@ export default function sessionPersistenceExtension(pi: ExtensionAPI) {
 		if (!ctx.cwd) return;
 
 		try {
-			currentDb = getDatabase(ctx.cwd);
+			currentDb = getDatabase();
 			await currentDb.init();
 
 			// Get session ID or create new tracking entry
