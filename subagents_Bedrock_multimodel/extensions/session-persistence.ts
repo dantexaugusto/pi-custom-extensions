@@ -85,7 +85,8 @@ class SessionDatabase {
 		CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 		CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
 			content,
-			content_rowid=id
+			content='messages',
+			content_rowid='id'
 		);
 		`;
 
@@ -141,8 +142,6 @@ class SessionDatabase {
 			VALUES ('${sessionId}', '${timestamp}', '${role}', '${escapedContent}', 
 					'${metadata?.model || ""}', ${metadata?.cost || 0}, 
 					${metadata?.inputTokens || 0}, ${metadata?.outputTokens || 0});
-			INSERT INTO messages_fts (content, content_rowid) 
-			VALUES ('${escapedContent}', last_insert_rowid());
 		`;
 
 		await this.execSql(sql);
@@ -233,7 +232,6 @@ class SessionDatabase {
 
 		const sql = `
 			DELETE FROM messages WHERE timestamp < '${cutoffStr}';
-			DELETE FROM messages_fts WHERE content_rowid NOT IN (SELECT id FROM messages);
 		`;
 
 		await this.execSql(sql);
