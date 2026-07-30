@@ -346,35 +346,45 @@ export default function sessionPersistenceExtension(pi: ExtensionAPI) {
 	});
 
 	// Register commands for querying history
-	pi.registerCommand?.({
-		name: "search-history",
-		description: "Search conversation history. Usage: /search-history query",
-		async execute(args, ctx) {
-			if (!currentDb) return { error: "No active database" };
+	// Format: pi.registerCommand("name", { description, handler })
+	pi.registerCommand?.("search-history", {
+		description: "Search conversation history",
+		handler: async (args, ctx) => {
+			if (!currentDb) {
+				ctx.ui.notify("No active database", "error");
+				return;
+			}
 
 			try {
-				// Parse query from args
-				const query = args?._ || args?.query || String(args);
+				const query = args || "";
 				const results = await currentDb.searchContext(query, 10);
+				ctx.ui.notify(`Found ${results.length} results`, "info");
 				return { results };
 			} catch (err) {
+				ctx.ui.notify(`Search failed: ${err}`, "error");
 				return { error: `Search failed: ${err}` };
 			}
 		},
 	});
 
-	pi.registerCommand?.({
-		name: "list-sessions",
+	pi.registerCommand?.("list-sessions", {
 		description: "List all saved sessions",
-		async execute(_args, ctx) {
-			if (!currentDb) return { error: "No active database" };
+		handler: async (_args, ctx) => {
+			if (!currentDb) {
+				ctx.ui.notify("No active database", "error");
+				return;
+			}
 
 			try {
 				const sessions = await currentDb.getAllSessions();
+				ctx.ui.notify(`Found ${sessions.length} sessions`, "info");
 				return { sessions };
 			} catch (err) {
+				ctx.ui.notify(`Failed to list: ${err}`, "error");
 				return { error: `Failed to list sessions: ${err}` };
 			}
 		},
 	});
+
+	console.log("[session-persistence] Commands registered: /search-history, /list-sessions");
 }
