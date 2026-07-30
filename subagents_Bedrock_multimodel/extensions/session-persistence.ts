@@ -345,7 +345,9 @@ export default function sessionPersistenceExtension(pi: ExtensionAPI) {
 		}
 	});
 
-	// Register commands for querying history
+	// Register commands for querying history (TEMPORARILY DISABLED - causing autocomplete crash)
+	// TODO: Fix command registration causing TypeError in autocomplete
+	/*
 	pi.registerCommand?.({
 		name: "search-history",
 		description: "Search conversation history by content",
@@ -379,4 +381,6 @@ export default function sessionPersistenceExtension(pi: ExtensionAPI) {
 			}
 		},
 	});
+	*/
+	console.log("[session-persistence] Commands temporarily disabled due to autocomplete bug");
 }
