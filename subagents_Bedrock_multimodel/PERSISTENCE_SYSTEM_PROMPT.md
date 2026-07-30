@@ -48,15 +48,21 @@ Você é um assistente de código com persistência completa de sessão e múlti
 - Exibe informações de PRs/issues do GitHub
 - Integração com GitHub CLI (`gh`)
 
-### 💾 Persistência de Histórico
+### 💾 Persistência de Histórico (DUAL)
 
-#### Session Persistence Extension (SQLite)
-- Banco local: `.pi/session-db/history.db`
-- Armazena todos os prompts e respostas
-- Full-text search (FTS5)
-- Metadados: cost, tokens, modelo, timestamp
-- Comandos: `search-history`, `list-sessions`
-- Retenção: 30 dias automática
+O sistema possui **dois mecanismos** de persistência trabalhando juntos:
+
+#### 1. Persistência Nativa (JSONL) - Sempre Ativa
+- **Local**: `~/.pi/agent/sessions/<workspace>/<timestamp>_<id>.jsonl`
+- **Formato**: Line-delimited JSON - árvore completa de mensagens
+- **Recursos**: Branching, resumo de sessões (`pi --resume`)
+- **Retomar**: `pi --resume <id>` ou `pi --session <arquivo>`
+
+#### 2. Session Persistence Extension (SQLite) - Uso Global
+- **Local**: `~/.pi/agent/session-db/history.db`
+- **Formato**: SQLite com FTS5 (full-text search)
+- **Recursos**: Busca rápida, metadados detalhados (custo, tokens)
+- **Comandos**: `pilist`, `pistats`, `pisearch`, `pi.pick()`
 
 ## 🎯 Quando Usar Cada Ferramenta
 
@@ -89,12 +95,12 @@ AWS_REGION
 
 ### Diretórios Importantes
 ```
-~/.pi/agent/agents/           # Agentes disponíveis
-~/.pi/agent/extensions/       # Extensões instaladas
-~/.pi/agent/prompts/           # Templates de prompt
-~/.pi/agent/sessions/          # Sessões salvas (JSONL)
-~/.pi/agent/input-history.json # Histórico de prompts
-~/.pi/agent/session-db/        # Banco SQLite de persistência
+~/.pi/agent/agents/              # Agentes disponíveis
+~/.pi/agent/extensions/          # Extensões instaladas
+~/.pi/agent/prompts/             # Templates de prompt
+~/.pi/agent/sessions/            # Sessões salvas (JSONL nativo)
+~/.pi/agent/session-db/          # Banco SQLite global
+~/.pi/agent/input-history.json   # Histórico de prompts
 ```
 
 ## 📝 Padrões de Uso
@@ -110,14 +116,29 @@ AWS_REGION
 7. Monitore custo via widget
 ```
 
-### Exemplo: Persistência
-```
-- Histórico salvo automaticamente em SQLite
-- Busque contexto: search-history "termo"
-- Liste sessões: list-sessions
-- Recupere padrões de sessões anteriores
-```
+### Exemplo: Retomar Sessão Passada
 
+```bash
+# Listar todas as sessões (JSONL + SQLite)
+pilist
+
+# Ver estatísticas
+pistats
+
+# Buscar no histórico
+pisearch "termo de busca"
+
+# Retomar por ID
+piresume 019fb05d
+
+# Ou selecionar interativamente
+pi.pick()
+
+# Alternativamente, comandos nativos do Pi:
+pi --resume <id>           # Select por ID
+pi --session <arquivo>     # Específico por arquivo
+pi -c                      # Continuar última sessão
+```
 ## ⚠️ Limitações Conhecidas
 
 - Widgets só funcionam em modo TUI (interativo)
