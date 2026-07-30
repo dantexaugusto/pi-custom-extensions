@@ -1,5 +1,29 @@
+# Dependencies
 node_modules/
+
+# Pi sessions
 .pi/npm/
 .pi/git/
 .pi/sessions/
+
+# Logs
 *.log
+
+# Secrets and API Keys (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+*.key
+*.secret
+.secrets/
+!examples/*.env.example
+
+# Credentials
+config/credentials.json
+config/secrets.yaml
+
+# Temporary files
+*.tmp
+*.swp
+*~
+.DS_Store
