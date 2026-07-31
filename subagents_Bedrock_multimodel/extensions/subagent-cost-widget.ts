@@ -1,12 +1,15 @@
 /**
  * Subagent Cost Tracker Widget - Persist usage and cost statistics across sessions
  * 
- * FIXED: Command registration moved to session_start (was causing autocomplete crash)
+ * FIXED v2: Now uses responsive width and ANSI-safe rendering
+ * - Uses truncateToWidth() and visibleWidth() from pi-tui
+ * - Never exceeds the width parameter in render()
+ * - Implements render cache for performance
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Text } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 interface SubagentUsage {
 	agent: string;
@@ -52,12 +55,45 @@ function formatDuration(startTime: string): string {
 	return `${minutes}m`;
 }
 
+/**
+ * Safely pad a styled string to a target visible width
+ * Handles ANSI codes correctly by using visibleWidth()
+ */
+function safePadEnd(text: string, targetWidth: number): string {
+	const vis = visibleWidth(text);
+	const padding = Math.max(0, targetWidth - vis);
+	return text + " ".repeat(padding);
+}
+
+function safePadStart(text: string, targetWidth: number): string {
+	const vis = visibleWidth(text);
+	const padding = Math.max(0, targetWidth - vis);
+	return " ".repeat(padding) + text;
+}
+
+/**
+ * Create a horizontal line that respects width
+ */
+function horizontalLine(char: string, width: number): string {
+	return char.repeat(Math.max(0, width));
+}
+
 export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 	const stats: SessionStats = {
 		agents: new Map(),
 		totalCost: 0,
 		totalInvocations: 0,
 		startTime: new Date().toISOString(),
+	};
+
+	// Render cache for performance
+	let cachedLines: string[] = [];
+	let cachedWidth = 0;
+	let cacheVersion = 0;
+	let lastRenderedVersion = -1;
+
+	const invalidateCache = () => {
+		cacheVersion++;
 	};
 
 	const updateStats = (agent: string, usage: {
@@ -89,58 +125,113 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		stats.agents.set(agent, existing);
 		stats.totalCost += usage.cost || 0;
 		stats.totalInvocations++;
+		
+		invalidateCache();
 	};
 
-	const renderWidget = (_tui: unknown, theme: Theme) => {
-		const lines: string[] = [];
+	const createWidget = (_tui: unknown, theme: Theme) => {
+		return {
+			render(width: number): string[] {
+				// Use cache if valid
+				if (width === cachedWidth && lastRenderedVersion === cacheVersion) {
+					return cachedLines;
+				}
 
-		// Header
-		lines.push(
-			theme.fg("accent", "┌─ ") +
-			theme.fg("accent", theme.bold("SUBAGENT COST TRACKER")) +
-			theme.fg("accent", ` ─ ${formatDuration(stats.startTime)}`.padEnd(41) + "┐")
-		);
+				const lines: string[] = [];
+				// Reserve 2 chars for box borders
+				const innerWidth = Math.max(10, width - 2);
 
-		// Session summary
-		lines.push(
-			theme.fg("accent", "│") +
-			" " +
-			theme.fg("muted", `Total: ${stats.totalInvocations} calls · ${formatCost(stats.totalCost)}`) +
-			" ".repeat(76 - String(stats.totalInvocations).length - String(formatCost(stats.totalCost)).length - 16) +
-			theme.fg("accent", "│")
-		);
+				// Header
+				const title = theme.bold("SUBAGENT COST TRACKER");
+				const duration = ` ─ ${formatDuration(stats.startTime)} `;
+				const titleVisible = visibleWidth(title);
+				const durationVisible = visibleWidth(duration);
+				
+				// Calculate remaining space for decorative dashes
+				// "┌─ " = 3 chars, "─┐" = 2 chars
+				const headerDecoSpace = Math.max(0, innerWidth - titleVisible - durationVisible - 3);
+				const headerLine = theme.fg("accent", "┌─ ") +
+					theme.fg("accent", title) +
+					theme.fg("accent", duration) +
+					theme.fg("accent", horizontalLine("─", headerDecoSpace) + "┐");
+				lines.push(truncateToWidth(headerLine, width));
 
-		lines.push(theme.fg("accent", "├" + "─".repeat(76) + "┤"));
+				// Session summary line
+				const summaryText = `Total: ${stats.totalInvocations} calls · ${formatCost(stats.totalCost)}`;
+				const summaryColored = theme.fg("muted", summaryText);
+				const summaryPadded = safePadEnd(summaryColored, innerWidth - 1);
+				const summaryLine = theme.fg("accent", "│") + " " + summaryPadded + theme.fg("accent", "│");
+				lines.push(truncateToWidth(summaryLine, width));
 
-		// Column headers
-		const header = `${theme.fg("muted", "Agent").padEnd(12)} ${theme.fg("muted", "Calls").padStart(6)} ${theme.fg("muted", "Input").padStart(8)} ${theme.fg("muted", "Output").padStart(8)} ${theme.fg("muted", "Cost").padStart(10)}`;
-		lines.push(theme.fg("accent", "│ ") + header + theme.fg("accent", " │"));
+				// Separator
+				const sepLine = theme.fg("accent", "├" + horizontalLine("─", innerWidth) + "┤");
+				lines.push(truncateToWidth(sepLine, width));
 
-		// Agent rows
-		const sortedAgents = Array.from(stats.agents.values()).sort((a, b) => b.cost - a.cost);
-		for (const agent of sortedAgents.slice(0, 8)) {
-			const row = [
-				theme.fg("toolTitle", agent.agent.slice(0, 12).padEnd(12)),
-				theme.fg("dim", String(agent.invocations).padStart(6)),
-				theme.fg("dim", formatTokens(agent.inputTokens).padStart(8)),
-				theme.fg("dim", formatTokens(agent.outputTokens).padStart(8)),
-				theme.fg("warning", formatCost(agent.cost).padStart(10)),
-			].join(" ");
-			lines.push(theme.fg("accent", "│ ") + row + theme.fg("accent", " │"));
-		}
+				// Calculate dynamic column widths based on available space
+				// Minimum: Agent(8) + Calls(5) + Input(6) + Output(6) + Cost(8) + spaces(4) = 37
+				const minColsWidth = 37;
+				const availableForCols = Math.max(minColsWidth, innerWidth - 2); // -2 for padding
+				
+				// Dynamic column sizing
+				const agentColWidth = Math.min(16, Math.max(8, Math.floor(availableForCols * 0.28)));
+				const callsColWidth = Math.max(5, Math.floor(availableForCols * 0.12));
+				const inputColWidth = Math.max(6, Math.floor(availableForCols * 0.18));
+				const outputColWidth = Math.max(6, Math.floor(availableForCols * 0.18));
+				const costColWidth = Math.max(8, Math.floor(availableForCols * 0.20));
 
-		// Fill empty rows if needed
-		const remainingRows = 8 - Math.min(sortedAgents.length, 8);
-		for (let i = 0; i < remainingRows; i++) {
-			lines.push(theme.fg("accent", "│") + " ".repeat(76) + theme.fg("accent", "│"));
-		}
+				// Column headers
+				const headerAgent = safePadEnd(theme.fg("muted", "Agent"), agentColWidth);
+				const headerCalls = safePadStart(theme.fg("muted", "Calls"), callsColWidth);
+				const headerInput = safePadStart(theme.fg("muted", "Input"), inputColWidth);
+				const headerOutput = safePadStart(theme.fg("muted", "Output"), outputColWidth);
+				const headerCost = safePadStart(theme.fg("muted", "Cost"), costColWidth);
+				
+				const colHeaderContent = `${headerAgent} ${headerCalls} ${headerInput} ${headerOutput} ${headerCost}`;
+				const colHeaderPadded = safePadEnd(colHeaderContent, innerWidth - 1);
+				const colHeaderLine = theme.fg("accent", "│ ") + colHeaderPadded + theme.fg("accent", "│");
+				lines.push(truncateToWidth(colHeaderLine, width));
 
-		// Footer
-		lines.push(theme.fg("accent", "└" + "─".repeat(76) + "┘"));
+				// Agent rows
+				const sortedAgents = Array.from(stats.agents.values()).sort((a, b) => b.cost - a.cost);
+				const maxRows = Math.min(8, Math.max(1, Math.floor((width > 60 ? 8 : 4))));
+				
+				for (const agent of sortedAgents.slice(0, maxRows)) {
+					const agentName = agent.agent.slice(0, agentColWidth - 1);
+					const colAgent = safePadEnd(theme.fg("toolTitle", agentName), agentColWidth);
+					const colCalls = safePadStart(theme.fg("dim", String(agent.invocations)), callsColWidth);
+					const colInput = safePadStart(theme.fg("dim", formatTokens(agent.inputTokens)), inputColWidth);
+					const colOutput = safePadStart(theme.fg("dim", formatTokens(agent.outputTokens)), outputColWidth);
+					const colCost = safePadStart(theme.fg("warning", formatCost(agent.cost)), costColWidth);
+					
+					const rowContent = `${colAgent} ${colCalls} ${colInput} ${colOutput} ${colCost}`;
+					const rowPadded = safePadEnd(rowContent, innerWidth - 1);
+					const rowLine = theme.fg("accent", "│ ") + rowPadded + theme.fg("accent", "│");
+					lines.push(truncateToWidth(rowLine, width));
+				}
 
-		const container = new Container();
-		container.addChild(new Text(lines.join("\n"), 0, 0));
-		return container;
+				// Fill empty rows if needed
+				const renderedRows = Math.min(sortedAgents.length, maxRows);
+				const remainingRows = maxRows - renderedRows;
+				for (let i = 0; i < remainingRows; i++) {
+					const emptyLine = theme.fg("accent", "│") + " ".repeat(innerWidth) + theme.fg("accent", "│");
+					lines.push(truncateToWidth(emptyLine, width));
+				}
+
+				// Footer
+				const footerLine = theme.fg("accent", "└" + horizontalLine("─", innerWidth) + "┘");
+				lines.push(truncateToWidth(footerLine, width));
+
+				// Update cache
+				cachedLines = lines;
+				cachedWidth = width;
+				lastRenderedVersion = cacheVersion;
+
+				return lines;
+			},
+			invalidate() {
+				invalidateCache();
+			}
+		};
 	};
 
 	// FIXED: All UI operations moved into session_start handlers
@@ -149,7 +240,6 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		if (!ctx.hasUI) return;
 		
 		// ✅ SAFE: Register command AFTER session_start
-		// Format: pi.registerCommand("name", { description, handler })
 		pi.registerCommand?.("toggle-cost-widget", {
 			description: "Toggle the subagent cost tracker widget",
 			handler: async (_args, cmdCtx) => {
@@ -162,9 +252,10 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		stats.totalCost = 0;
 		stats.totalInvocations = 0;
 		stats.startTime = new Date().toISOString();
+		invalidateCache();
 		
-		// Initialize widget
-		ctx.ui.setWidget(WIDGET_NAME, renderWidget);
+		// Initialize widget with responsive renderer
+		ctx.ui.setWidget(WIDGET_NAME, createWidget);
 		
 		// Set status line
 		ctx.ui.setStatus("subagent-cost", ctx.ui.theme.fg("dim", "💰 $0.00"));
@@ -192,7 +283,7 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		}
 		
 		// Update widget using ctx from event
-		ctx.ui.setWidget(WIDGET_NAME, renderWidget);
+		ctx.ui.setWidget(WIDGET_NAME, createWidget);
 		
 		// Update status line
 		ctx.ui.setStatus("subagent-cost", ctx.ui.theme.fg("accent", `💰 ${formatCost(stats.totalCost)}`));
