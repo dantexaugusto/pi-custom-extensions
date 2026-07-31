@@ -34,6 +34,12 @@ if [ -d "$SCRIPT_DIR/extensions/subagent" ]; then
     echo "   ✓ subagent/"
 fi
 
+# Copy widgets
+if [ -f "$SCRIPT_DIR/extensions/subagent-cost-widget.ts" ]; then
+    cp "$SCRIPT_DIR/extensions/subagent-cost-widget.ts" "$TARGET_DIR/extensions/"
+    echo "   ✓ subagent-cost-widget.ts"
+fi
+
 echo ""
 echo "=== Installation Complete ==="
 echo ""
@@ -42,6 +48,12 @@ ls -1 "$TARGET_DIR/agents"/*.md 2>/dev/null | while read f; do
     name=$(basename "$f" .md)
     echo "   • $name"
 done
+echo ""
+echo "Extensions installed:"
+ls -1 "$TARGET_DIR/extensions"/*.ts 2>/dev/null | while read f; do
+    name=$(basename "$f")
+    echo "   • $name"
+done || true
 echo ""
 echo "Models configured:"
 echo "   • scout    -> bedrock/us.anthropic.claude-sonnet-5-20251022-v2:0"
