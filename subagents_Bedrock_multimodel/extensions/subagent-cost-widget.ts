@@ -141,18 +141,24 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 				// Reserve 2 chars for box borders
 				const innerWidth = Math.max(10, width - 2);
 
-				// Header
+				// Header - must be exactly (innerWidth + 2) chars total
+				// Structure: "┌─ " (3) + TITLE + " ─ DURATION " + "─" × remaining + "┐" (1)
 				const title = theme.bold("SUBAGENT COST TRACKER");
-				const duration = ` ─ ${formatDuration(stats.startTime)} `;
+				const duration = formatDuration(stats.startTime);
 				const titleVisible = visibleWidth(title);
-				const durationVisible = visibleWidth(duration);
 				
-				// Calculate remaining space for decorative dashes
-				// "┌─ " = 3 chars, "─┐" = 2 chars
-				const headerDecoSpace = Math.max(0, innerWidth - titleVisible - durationVisible - 3);
+				// "┌─ " = 3 chars, "┐" = 1 char
+				// Header: ┌─ TITLE ─ 5m ────────┐  (total = innerWidth + 2)
+				const durationText = ` ─ ${duration} `;
+				const durationVisible = visibleWidth(durationText);
+				
+				// Remaining space for decorative dashes: innerWidth + 2 - 3 - title - duration - 1
+				const headerDecoSpace = Math.max(0, innerWidth - titleVisible - durationVisible - 2);
+				
+				// Build header: "┌─ " + TITLE + " ─ 5m " + "─" × deco + "┐"
 				const headerLine = theme.fg("accent", "┌─ ") +
 					theme.fg("accent", title) +
-					theme.fg("accent", duration) +
+					theme.fg("accent", durationText) +
 					theme.fg("accent", horizontalLine("─", headerDecoSpace) + "┐");
 				lines.push(truncateToWidth(headerLine, width));
 
