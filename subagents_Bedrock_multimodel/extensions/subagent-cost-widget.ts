@@ -261,18 +261,18 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		ctx.ui.setStatus("subagent-cost", ctx.ui.theme.fg("dim", "💰 $0.00"));
 	});
 
-	// Listen for subagent tool results
-	pi.on("tool_result_end", (event, ctx) => {
+	// Listen for subagent tool results - using tool_result (not tool_result_end)
+	pi.on("tool_result", (event, ctx) => {
 		if (!ctx.hasUI) return;
 		
 		// Check if this is a subagent tool result
 		if (event.toolName !== "subagent") return;
 		
-		const result = event.result;
-		if (!result?.details?.results) return;
+		const details = event.details;
+		if (!details?.results) return;
 
 		// Process each subagent result
-		for (const r of result.details.results) {
+		for (const r of details.results) {
 			updateStats(r.agent, {
 				input: r.usage?.input || 0,
 				output: r.usage?.output || 0,
@@ -282,7 +282,7 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 			});
 		}
 		
-		// Update widget using ctx from event
+		// Update widget
 		ctx.ui.setWidget(WIDGET_NAME, createWidget);
 		
 		// Update status line
