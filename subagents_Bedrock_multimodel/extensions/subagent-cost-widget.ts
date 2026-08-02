@@ -262,9 +262,6 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		
 		// Initialize widget with responsive renderer
 		ctx.ui.setWidget(WIDGET_NAME, createWidget);
-		
-		// Set status line
-		ctx.ui.setStatus("subagent-cost", ctx.ui.theme.fg("dim", "💰 $0.00"));
 	});
 
 	// Listen for subagent tool results - using tool_result (not tool_result_end)
@@ -290,9 +287,6 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		
 		// Update widget
 		ctx.ui.setWidget(WIDGET_NAME, createWidget);
-		
-		// Update status line
-		ctx.ui.setStatus("subagent-cost", ctx.ui.theme.fg("accent", `💰 ${formatCost(stats.totalCost)}`));
 	});
 
 	// Clear widget when session ends
@@ -300,6 +294,5 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		if (!ctx.hasUI) return;
 		
 		ctx.ui.setWidget(WIDGET_NAME, undefined);
-		ctx.ui.setStatus("subagent-cost", undefined);
 	});
 }
