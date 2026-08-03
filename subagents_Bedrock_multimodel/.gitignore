@@ -1,0 +1,24 @@
+# Test directories (worker tests)
+backend/
+frontend/
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Secrets
+.secrets/
+*.pem
+*.key
