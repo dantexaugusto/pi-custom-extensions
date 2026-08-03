@@ -51,27 +51,24 @@ interface KiroDetails {
  */
 function findKiroExecutable(): string | null {
   const possiblePaths = [
-    "kiro-cli", // In PATH
-    "kiro", // Alternative name in PATH
     path.join(os.homedir(), ".local", "bin", "kiro-cli"), // AWS default install location
     path.join(os.homedir(), ".local", "bin", "kiro"), // Alternative
     "/usr/local/bin/kiro-cli",
     "/usr/local/bin/kiro",
   ];
 
+  // Try absolute paths first
   for (const p of possiblePaths) {
     try {
-      // If it's an absolute path, check if file exists
-      if (path.isAbsolute(p)) {
-        if (fs.existsSync(p)) return p;
-      } else {
-        // If it's a relative name, try to spawn it
-        return p; // Let spawn try to find it in PATH
+      if (fs.existsSync(p)) {
+        return p;
       }
     } catch {
       continue;
     }
   }
+
+  // Fall back to PATH lookup
   return null;
 }
 
