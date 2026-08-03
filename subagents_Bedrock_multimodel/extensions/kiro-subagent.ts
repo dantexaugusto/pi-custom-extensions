@@ -43,7 +43,8 @@ interface KiroDetails {
 
 async function checkKiroInstalled(): Promise<{ installed: boolean; version?: string; error?: string }> {
   return new Promise((resolve) => {
-    const proc = spawn("kiro", ["--version"], {
+    // Try kiro-cli first (AWS installed name), then kiro (generic)
+    const proc = spawn("kiro-cli", ["--version"], {
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -99,7 +100,8 @@ async function runKiro(
   args.push(task);
 
   return new Promise((resolve) => {
-    const proc = spawn("kiro", args, {
+    // Try kiro-cli first (AWS installed name), then kiro (generic)
+    const proc = spawn("kiro-cli", args, {
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
