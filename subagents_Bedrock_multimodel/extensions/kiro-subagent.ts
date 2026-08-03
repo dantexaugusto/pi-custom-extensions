@@ -41,10 +41,50 @@ interface KiroDetails {
 // Kiro CLI Integration
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Kiro CLI Integration
+// ---------------------------------------------------------------------------
+
+/**
+ * Find the kiro-cli executable in common locations
+ */
+function findKiroExecutable(): string | null {
+  const possiblePaths = [
+    "kiro-cli", // In PATH
+    "kiro", // Alternative name in PATH
+    path.join(os.homedir(), ".local", "bin", "kiro-cli"), // AWS default install location
+    path.join(os.homedir(), ".local", "bin", "kiro"), // Alternative
+    "/usr/local/bin/kiro-cli",
+    "/usr/local/bin/kiro",
+  ];
+
+  for (const p of possiblePaths) {
+    try {
+      // If it's an absolute path, check if file exists
+      if (path.isAbsolute(p)) {
+        if (fs.existsSync(p)) return p;
+      } else {
+        // If it's a relative name, try to spawn it
+        return p; // Let spawn try to find it in PATH
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+import * as fs from "node:fs";
+
 async function checkKiroInstalled(): Promise<{ installed: boolean; version?: string; error?: string }> {
   return new Promise((resolve) => {
-    // Try kiro-cli first (AWS installed name), then kiro (generic)
-    const proc = spawn("kiro-cli", ["--version"], {
+    const kiroPath = findKiroExecutable();
+    if (!kiroPath) {
+      resolve({ installed: false, error: "kiro-cli not found in PATH or ~/.local/bin/" });
+      return;
+    }
+
+    const proc = spawn(kiroPath, ["--version"], {
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -100,8 +140,22 @@ async function runKiro(
   args.push(task);
 
   return new Promise((resolve) => {
-    // Try kiro-cli first (AWS installed name), then kiro (generic)
-    const proc = spawn("kiro-cli", args, {
+    // Find kiro executable
+    const kiroPath = findKiroExecutable();
+    if (!kiroPath) {
+      const duration = Date.now() - startTime;
+      resolve({
+        success: false,
+        output: "",
+        exitCode: 1,
+        stderr: "kiro-cli not found in PATH or ~/.local/bin/",
+        duration,
+        format,
+      });
+      return;
+    }
+
+    const proc = spawn(kiroPath, args, {
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
