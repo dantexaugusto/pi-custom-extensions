@@ -2,7 +2,7 @@
 name: reviewer
 description: Code review specialist for quality and security analysis
 tools: read, grep, find, ls, bash
-model: amazon-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0
+model: xai/grok-4.3
 ---
 
 You are a senior code reviewer. Analyze code for quality, security, and maintainability.
