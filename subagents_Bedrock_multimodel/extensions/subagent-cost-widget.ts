@@ -5,11 +5,17 @@
  * - Uses truncateToWidth() and visibleWidth() from pi-tui
  * - Never exceeds the width parameter in render()
  * - Implements render cache for performance
+ * 
+ * v3: Shows all available agents from session start
+ * - Agents are discovered from ~/.pi/agent/agents/ at startup
+ * - Usage stats update as agents are invoked
  */
 
+import * as path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { discoverAgents, type AgentScope } from "./subagent/agents.ts";
 
 interface SubagentUsage {
 	agent: string;
@@ -258,6 +264,22 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		stats.totalCost = 0;
 		stats.totalInvocations = 0;
 		stats.startTime = new Date().toISOString();
+
+		// Discover all available agents and pre-populate the widget
+		const discovery = discoverAgents(ctx.cwd, "user" as AgentScope);
+		for (const agent of discovery.agents) {
+			stats.agents.set(agent.name, {
+				agent: agent.name,
+				invocations: 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+				cost: 0,
+				lastUsed: new Date().toISOString(),
+			});
+		}
+
 		invalidateCache();
 		
 		// Initialize widget with responsive renderer
