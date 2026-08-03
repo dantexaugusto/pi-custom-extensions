@@ -199,11 +199,14 @@ function updateSubagentsWidget(
 				// Reserve 2 chars for box borders
 				const innerWidth = Math.max(20, width - 2);
 
-				// Header
+				// Header - total width must match footer: innerWidth + 2
+				// Structure: "┌─ " (3) + TITLE + " " (1) + "─" × n + "┐" (1)
+				// Footer: "└" + "─" × innerWidth + "┘" = innerWidth + 2
+			// Header total: 3 + title + 1 + headerDecoSpace + 1 = innerWidth + 2
+				// So: headerDecoSpace = innerWidth + 2 - 3 - title - 1 - 1 = innerWidth - title - 3
 				const title = theme.bold("SUBAGENTS STATUS DASHBOARD");
 				const titleVisible = visibleWidth(title);
-				// "┌─ " = 3 chars, " ─┐" = 3 chars
-				const headerDecoSpace = Math.max(0, innerWidth - titleVisible - 4);
+				const headerDecoSpace = Math.max(0, innerWidth - titleVisible - 3);
 				const headerLine = theme.fg("accent", "┌─ ") +
 					theme.fg("accent", title) +
 					theme.fg("accent", " " + horizontalLine("─", headerDecoSpace) + "┐");

@@ -165,8 +165,8 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 				// Session summary line
 				const summaryText = `Total: ${stats.totalInvocations} calls · ${formatCost(stats.totalCost)}`;
 				const summaryColored = theme.fg("muted", summaryText);
-				const summaryPadded = safePadEnd(summaryColored, innerWidth - 1);
-				const summaryLine = theme.fg("accent", "│") + " " + summaryPadded + theme.fg("accent", "│");
+				const summaryPadded = safePadEnd(summaryColored, innerWidth - 2);
+				const summaryLine = theme.fg("accent", "│ ") + summaryPadded + theme.fg("accent", " │");
 				lines.push(truncateToWidth(summaryLine, width));
 
 				// Separator
@@ -193,8 +193,8 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 				const headerCost = safePadStart(theme.fg("muted", "Cost"), costColWidth);
 				
 				const colHeaderContent = `${headerAgent} ${headerCalls} ${headerInput} ${headerOutput} ${headerCost}`;
-				const colHeaderPadded = safePadEnd(colHeaderContent, innerWidth - 1);
-				const colHeaderLine = theme.fg("accent", "│ ") + colHeaderPadded + theme.fg("accent", "│");
+				const colHeaderPadded = safePadEnd(colHeaderContent, innerWidth - 2);
+				const colHeaderLine = theme.fg("accent", "│ ") + colHeaderPadded + theme.fg("accent", " │");
 				lines.push(truncateToWidth(colHeaderLine, width));
 
 				// Agent rows
@@ -210,8 +210,8 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 					const colCost = safePadStart(theme.fg("warning", formatCost(agent.cost)), costColWidth);
 					
 					const rowContent = `${colAgent} ${colCalls} ${colInput} ${colOutput} ${colCost}`;
-					const rowPadded = safePadEnd(rowContent, innerWidth - 1);
-					const rowLine = theme.fg("accent", "│ ") + rowPadded + theme.fg("accent", "│");
+					const rowPadded = safePadEnd(rowContent, innerWidth - 2);
+					const rowLine = theme.fg("accent", "│ ") + rowPadded + theme.fg("accent", " │");
 					lines.push(truncateToWidth(rowLine, width));
 				}
 

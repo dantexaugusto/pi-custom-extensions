@@ -20,7 +20,7 @@ import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { Message } from "@earendil-works/pi-ai";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, getMarkdownTheme, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import { Container, Markdown, Spacer, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { type AgentConfig, type AgentScope, discoverAgents } from "./agents.ts";
 
@@ -162,6 +162,29 @@ interface SubagentDetails {
 	results: SingleResult[];
 }
 
+/**
+ * Helper: Safely pad a styled string to a target visible width
+ * Handles ANSI codes correctly by using visibleWidth()
+ */
+function safePadEnd(text: string, targetWidth: number): string {
+	const vis = visibleWidth(text);
+	const padding = Math.max(0, targetWidth - vis);
+	return text + " ".repeat(padding);
+}
+
+function safePadStart(text: string, targetWidth: number): string {
+	const vis = visibleWidth(text);
+	const padding = Math.max(0, targetWidth - vis);
+	return " ".repeat(padding) + text;
+}
+
+/**
+ * Create a horizontal line that respects width
+ */
+function horizontalLine(char: string, width: number): string {
+	return char.repeat(Math.max(0, width));
+}
+
 function updateSubagentsWidget(
 	ctx: any,
 	mode: "single" | "parallel" | "chain",
@@ -170,131 +193,133 @@ function updateSubagentsWidget(
 	if (!ctx.hasUI) return;
 
 	ctx.ui.setWidget("subagents-tracker", (_tui: any, theme: any) => {
-		const lines: string[] = [];
-
-		// Header
-		lines.push(
-			theme.fg("accent", "┌─ ") +
-			theme.fg("accent", theme.bold("SUBAGENTS STATUS DASHBOARD")) +
-			theme.fg("accent", " ──────────────────────────────────────────────────┐")
-		);
-		lines.push(theme.fg("accent", "│") + " ".repeat(76) + theme.fg("accent", "│"));
-
-		// List of subagents and their statuses
-		for (const r of results) {
-			let statusStr = "";
-			if (r.exitCode === -1) {
-				statusStr = theme.fg("warning", "⏳ Running...");
-			} else if (r.exitCode === 0) {
-				statusStr = theme.fg("success", "✓ Succeeded");
-			} else if (r.exitCode === -2) {
-				statusStr = theme.fg("dim", "○ Pending");
-			} else if (r.exitCode > 0) {
-				statusStr = theme.fg("error", "✗ Failed");
-			} else {
-				statusStr = theme.fg("dim", "○ Pending");
-			}
-
-			const stepPrefix = r.step ? `[Step ${r.step}] ` : "";
-			const agentNameStr = `${stepPrefix}${r.agent}`;
-			const agentName = theme.fg("toolTitle", agentNameStr);
-			
-			// Format usage stats for this subagent
-			const turnsText = r.usage.turns > 0 ? ` (${r.usage.turns} turns)` : "";
-			const costText = r.usage.cost > 0 ? ` $${r.usage.cost.toFixed(4)}` : "";
-			const modelText = r.model ? ` [${r.model.split("/").pop()}]` : "";
-			const metricsText = theme.fg("dim", `${turnsText}${costText}${modelText}`);
-
-			// Main agent status line
-			let line = `  ${agentNameStr.padEnd(20)} ${r.exitCode === -1 ? "⏳ Running..." : r.exitCode === 0 ? "✓ Succeeded" : r.exitCode === -2 ? "○ Pending" : r.exitCode > 0 ? "✗ Failed" : "○ Pending"}`;
-			// Padded correctly with styles:
-			const coloredLine = `  ${agentName.padEnd(20 + agentName.length - agentNameStr.length)} ${statusStr.padEnd(25 + statusStr.length - (r.exitCode === -1 ? 12 : r.exitCode === 0 ? 11 : r.exitCode === -2 ? 9 : r.exitCode > 0 ? 8 : 9))} ${metricsText}`;
-			
-			// Let's compute actual visible width to pad properly
-			const totalVisible = 2 + agentNameStr.length + Math.max(0, 20 - agentNameStr.length) + 1 + (r.exitCode === -1 ? 12 : r.exitCode === 0 ? 11 : r.exitCode === -2 ? 9 : r.exitCode > 0 ? 8 : 9) + Math.max(0, 25 - (r.exitCode === -1 ? 12 : r.exitCode === 0 ? 11 : r.exitCode === -2 ? 9 : r.exitCode > 0 ? 8 : 9)) + 1 + (r.usage.turns > 0 ? ` (${r.usage.turns} turns)`.length : 0) + (r.usage.cost > 0 ? ` $${r.usage.cost.toFixed(4)}`.length : 0) + (r.model ? ` [${r.model.split("/").pop()}]`.length : 0);
-			const paddingNeeded = Math.max(0, 74 - totalVisible);
-
-			lines.push(
-				theme.fg("accent", "│") +
-				" " +
-				coloredLine +
-				" ".repeat(paddingNeeded) +
-				" " +
-				theme.fg("accent", "│")
-			);
-
-			// If the agent is currently executing a tool, show a sub-line
-			if (r.exitCode === -1 && r.currentTool) {
-				const shortenedTool = r.currentTool.length > 55 ? `${r.currentTool.slice(0, 55)}...` : r.currentTool;
-				const toolLine = theme.fg("dim", "    ↳ ") + theme.fg("muted", `running tool: ${shortenedTool}`);
-				const toolVisibleLength = 4 + 20 + shortenedTool.length; // "    ↳ running tool: " is 20 chars
-				const toolPadding = Math.max(0, 74 - toolVisibleLength);
-
-				lines.push(
-					theme.fg("accent", "│") +
-					" " +
-					toolLine +
-					" ".repeat(toolPadding) +
-					" " +
-					theme.fg("accent", "│")
-				);
-			}
-		}
-
-		lines.push(theme.fg("accent", "│") + " ".repeat(76) + theme.fg("accent", "│"));
-
-		// Aggregated metrics
-		let totalTurns = 0;
-		let totalInput = 0;
-		let totalOutput = 0;
-		let totalCost = 0;
-
-		for (const r of results) {
-			totalTurns += r.usage.turns;
-			totalInput += r.usage.input;
-			totalOutput += r.usage.output;
-			totalCost += r.usage.cost;
-		}
-
-		const totalCostText = totalCost > 0 ? `$${totalCost.toFixed(4)}` : "$0.0000";
-		
-		const metricsLine1 = `  Aggregated Metrics (${mode.toUpperCase()} mode):`;
-		lines.push(
-			theme.fg("accent", "│") +
-			" " +
-			theme.fg("accent", theme.bold(metricsLine1)).padEnd(74) +
-			" " +
-			theme.fg("accent", "│")
-		);
-
-		const metricsLine2 = `  • Total Turns: ${totalTurns.toString().padEnd(10)} • Est. Cost: ${totalCostText.padEnd(12)}`;
-		lines.push(
-			theme.fg("accent", "│") +
-			" " +
-			theme.fg("muted", metricsLine2).padEnd(74) +
-			" " +
-			theme.fg("accent", "│")
-		);
-
-		const metricsLine3 = `  • Input Tokens: ${formatTokens(totalInput).padEnd(9)} • Output Tokens: ${formatTokens(totalOutput).padEnd(10)}`;
-		lines.push(
-			theme.fg("accent", "│") +
-			" " +
-			theme.fg("muted", metricsLine3).padEnd(74) +
-			" " +
-			theme.fg("accent", "│")
-		);
-
-		lines.push(theme.fg("accent", "│") + " ".repeat(76) + theme.fg("accent", "│"));
-
-		// Footer border
-		lines.push(
-			theme.fg("accent", "└────────────────────────────────────────────────────────────────────────────┘")
-		);
-
 		return {
-			render: () => lines,
-			invalidate: () => {},
+			render(width: number): string[] {
+				const lines: string[] = [];
+				// Reserve 2 chars for box borders
+				const innerWidth = Math.max(20, width - 2);
+
+				// Header - total width must match footer: innerWidth + 2
+				// Structure: "┌─ " (3) + TITLE + " " (1) + "─" × n + "┐" (1)
+				// Footer: "└" + "─" × innerWidth + "┘" = innerWidth + 2
+			// Header total: 3 + title + 1 + headerDecoSpace + 1 = innerWidth + 2
+				// So: headerDecoSpace = innerWidth + 2 - 3 - title - 1 - 1 = innerWidth - title - 3
+				const title = theme.bold("SUBAGENTS STATUS DASHBOARD");
+				const titleVisible = visibleWidth(title);
+				const headerDecoSpace = Math.max(0, innerWidth - titleVisible - 3);
+				const headerLine = theme.fg("accent", "┌─ ") +
+					theme.fg("accent", title) +
+					theme.fg("accent", " " + horizontalLine("─", headerDecoSpace) + "┐");
+				lines.push(truncateToWidth(headerLine, width));
+
+				// Empty line
+				const emptyLine = theme.fg("accent", "│") + " ".repeat(innerWidth) + theme.fg("accent", "│");
+				lines.push(truncateToWidth(emptyLine, width));
+
+				// Dynamic column widths based on available space
+				const agentColWidth = Math.min(20, Math.max(10, Math.floor(innerWidth * 0.28)));
+				const statusColWidth = Math.min(15, Math.max(10, Math.floor(innerWidth * 0.18)));
+				const metricsColWidth = Math.max(15, innerWidth - agentColWidth - statusColWidth - 6);
+
+				// List of subagents and their statuses
+				for (const r of results) {
+					let statusText = "";
+					let statusColor = "dim";
+					if (r.exitCode === -1) {
+						statusText = "⏳ Running...";
+						statusColor = "warning";
+					} else if (r.exitCode === 0) {
+						statusText = "✓ Succeeded";
+						statusColor = "success";
+					} else if (r.exitCode === -2) {
+						statusText = "○ Pending";
+						statusColor = "dim";
+					} else if (r.exitCode > 0) {
+						statusText = "✗ Failed";
+						statusColor = "error";
+					} else {
+						statusText = "○ Pending";
+						statusColor = "dim";
+					}
+
+					const stepPrefix = r.step ? `[${r.step}] ` : "";
+					const agentNameStr = `${stepPrefix}${r.agent}`.slice(0, agentColWidth - 1);
+					const agentName = safePadEnd(theme.fg("toolTitle", agentNameStr), agentColWidth);
+					const statusStr = safePadEnd(theme.fg(statusColor, statusText.slice(0, statusColWidth)), statusColWidth);
+
+					// Format usage stats for this subagent
+					const turnsText = r.usage.turns > 0 ? `(${r.usage.turns}t)` : "";
+					const costText = r.usage.cost > 0 ? ` $${r.usage.cost.toFixed(3)}` : "";
+					const modelShort = r.model ? r.model.split("/").pop()?.slice(0, 12) || "" : "";
+					const modelText = modelShort ? ` [${modelShort}]` : "";
+					let metricsStr = `${turnsText}${costText}${modelText}`.slice(0, metricsColWidth);
+					const metricsText = theme.fg("dim", metricsStr);
+
+					// Build the row
+					const rowContent = `  ${agentName} ${statusStr} ${metricsText}`;
+					const rowPadded = safePadEnd(rowContent, innerWidth);
+					const rowLine = theme.fg("accent", "│") + rowPadded + theme.fg("accent", "│");
+					lines.push(truncateToWidth(rowLine, width));
+
+					// If the agent is currently executing a tool, show a sub-line
+					if (r.exitCode === -1 && r.currentTool) {
+						const maxToolLen = Math.max(10, innerWidth - 25);
+						const shortenedTool = r.currentTool.length > maxToolLen
+							? `${r.currentTool.slice(0, maxToolLen - 3)}...`
+							: r.currentTool;
+						const toolContent = theme.fg("dim", "    ↳ ") + theme.fg("muted", `tool: ${shortenedTool}`);
+						const toolPadded = safePadEnd(toolContent, innerWidth);
+						const toolLine = theme.fg("accent", "│") + toolPadded + theme.fg("accent", "│");
+						lines.push(truncateToWidth(toolLine, width));
+					}
+				}
+
+				// Empty separator
+				lines.push(truncateToWidth(emptyLine, width));
+
+				// Aggregated metrics
+				let totalTurns = 0;
+				let totalInput = 0;
+				let totalOutput = 0;
+				let totalCost = 0;
+
+				for (const r of results) {
+					totalTurns += r.usage.turns;
+					totalInput += r.usage.input;
+					totalOutput += r.usage.output;
+					totalCost += r.usage.cost;
+				}
+
+				const totalCostText = totalCost > 0 ? `$${totalCost.toFixed(4)}` : "$0.0000";
+
+				// Metrics header
+				const metricsHeader = `  Aggregated Metrics (${mode.toUpperCase()} mode):`;
+				const mh = theme.fg("accent", theme.bold(metricsHeader));
+				const mhPadded = safePadEnd(mh, innerWidth);
+				lines.push(truncateToWidth(theme.fg("accent", "│") + mhPadded + theme.fg("accent", "│"), width));
+
+				// Metrics line 1
+				const ml1 = `  • Turns: ${totalTurns} • Cost: ${totalCostText}`;
+				const ml1Colored = theme.fg("muted", ml1);
+				const ml1Padded = safePadEnd(ml1Colored, innerWidth);
+				lines.push(truncateToWidth(theme.fg("accent", "│") + ml1Padded + theme.fg("accent", "│"), width));
+
+				// Metrics line 2
+				const ml2 = `  • In: ${formatTokens(totalInput)} • Out: ${formatTokens(totalOutput)}`;
+				const ml2Colored = theme.fg("muted", ml2);
+				const ml2Padded = safePadEnd(ml2Colored, innerWidth);
+				lines.push(truncateToWidth(theme.fg("accent", "│") + ml2Padded + theme.fg("accent", "│"), width));
+
+				// Empty line before footer
+				lines.push(truncateToWidth(emptyLine, width));
+
+				// Footer border
+				const footerLine = theme.fg("accent", "└" + horizontalLine("─", innerWidth) + "┘");
+				lines.push(truncateToWidth(footerLine, width));
+
+				return lines;
+			},
+			invalidate() {},
 		};
 	}, { placement: "aboveEditor" });
 }
