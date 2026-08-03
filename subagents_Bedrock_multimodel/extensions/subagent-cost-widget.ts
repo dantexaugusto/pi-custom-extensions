@@ -264,6 +264,50 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		ctx.ui.setWidget(WIDGET_NAME, createWidget);
 	});
 
+	// Listen for subagent tool calls - show agents immediately when called
+	pi.on("tool_call", (event, ctx) => {
+		if (!ctx.hasUI) return;
+		if (event.toolName !== "subagent") return;
+		
+		const args = event.input;
+		if (!args) return;
+
+		// Add pending agents to show in widget immediately
+		const agentsToAdd: string[] = [];
+		if (args.agent) {
+			agentsToAdd.push(args.agent);
+		}
+		if (args.tasks && Array.isArray(args.tasks)) {
+			for (const t of args.tasks) {
+				if (t.agent) agentsToAdd.push(t.agent);
+			}
+		}
+		if (args.chain && Array.isArray(args.chain)) {
+			for (const step of args.chain) {
+				if (step.agent) agentsToAdd.push(step.agent);
+			}
+		}
+
+		// Pre-register agents as pending (0 stats)
+		for (const agentName of agentsToAdd) {
+			if (!stats.agents.has(agentName)) {
+				stats.agents.set(agentName, {
+					agent: agentName,
+					invocations: 0,
+					inputTokens: 0,
+					outputTokens: 0,
+					cacheRead: 0,
+					cacheWrite: 0,
+					cost: 0,
+					lastUsed: new Date().toISOString(),
+				});
+			}
+		}
+		
+		invalidateCache();
+		ctx.ui.setWidget(WIDGET_NAME, createWidget);
+	});
+
 	// Listen for subagent tool results - using tool_result (not tool_result_end)
 	pi.on("tool_result", (event, ctx) => {
 		if (!ctx.hasUI) return;
