@@ -40,6 +40,18 @@ if [ -f "$SCRIPT_DIR/extensions/subagent-cost-widget.ts" ]; then
     echo "   ✓ subagent-cost-widget.ts"
 fi
 
+# Copy web-search extension
+if [ -f "$SCRIPT_DIR/extensions/web-search.ts" ]; then
+    cp "$SCRIPT_DIR/extensions/web-search.ts" "$TARGET_DIR/extensions/"
+    echo "   ✓ web-search.ts"
+fi
+
+# Copy kiro-subagent extension
+if [ -f "$SCRIPT_DIR/extensions/kiro-subagent.ts" ]; then
+    cp "$SCRIPT_DIR/extensions/kiro-subagent.ts" "$TARGET_DIR/extensions/"
+    echo "   ✓ kiro-subagent.ts"
+fi
+
 echo ""
 echo "=== Installation Complete ==="
 echo ""
@@ -56,15 +68,19 @@ ls -1 "$TARGET_DIR/extensions"/*.ts 2>/dev/null | while read f; do
 done || true
 echo ""
 echo "Models configured:"
-echo "   • scout    -> bedrock/us.anthropic.claude-sonnet-5-20251022-v2:0"
-echo "   • planner  -> bedrock/us.anthropic.claude-sonnet-5-20251022-v2:0"
-echo "   • worker   -> bedrock/us.anthropic.claude-opus-5-20252001-v1:0"
-echo "   • tester   -> bedrock/us.anthropic.claude-sonnet-5-20251022-v2:0"
-echo "   • reviewer -> bedrock/us.anthropic.claude-sonnet-5-20251022-v2:0"
+echo "   • scout    -> bedrock/deepseek.v3.2"
+echo "   • planner  -> bedrock/qwen.qwen3-coder-next"
+echo "   • worker   -> bedrock/us.anthropic.claude-opus-4-5-20251101-v1:0"
+echo "   • tester   -> bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+echo "   • reviewer -> bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+echo "   • langgraph -> bedrock/us.anthropic.claude-opus-4-5-20251101-v1:0"
+echo "   • kiro     -> (uses kiro CLI)"
 echo ""
 echo "Requirements:"
 echo "   • AWS credentials configured (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION)"
 echo "   • Bedrock models enabled in your AWS account"
+echo "   • For web-search: TAVILY_API_KEY in ~/.secrets/ or env var"
+echo "   • For kiro: Install with 'curl -fsSL https://cli.kiro.dev/install | bash'"
 echo ""
 echo "Usage:"
 echo "   The 'subagent' tool is now available. Use it with:"
