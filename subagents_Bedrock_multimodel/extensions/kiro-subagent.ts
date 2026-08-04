@@ -11,6 +11,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { Text } from "@earendil-works/pi-tui";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -395,59 +396,45 @@ export default function (pi: ExtensionAPI) {
 
       if (action === "send" && message) {
         const preview = message.length > 60 ? `${message.slice(0, 60)}...` : message;
-        return {
-          type: "inline",
-          render() {
-            return [
-              `${theme.fg("accent", "⚡")} ${theme.fg("toolTitle", "kiro")} ${theme.fg("dim", "[tmux]")}`,
-              `   ${theme.fg("muted", preview)}`,
-            ];
-          },
-          invalidate() {},
-        };
+        const text = theme.fg("accent", "⚡") + " " + 
+          theme.fg("toolTitle", "kiro") + " " + 
+          theme.fg("dim", "[tmux]") + "\n" +
+          "   " + theme.fg("muted", preview);
+        return new Text(text, 0, 0);
       }
 
-      return {
-        type: "inline",
-        render() {
-          return [`${theme.fg("accent", "⚡")} ${theme.fg("toolTitle", "kiro")} ${theme.fg("dim", `[${action}]`)}`];
-        },
-        invalidate() {},
-      };
+      const text = theme.fg("accent", "⚡") + " " + 
+        theme.fg("toolTitle", "kiro") + " " + 
+        theme.fg("dim", `[${action}]`);
+      return new Text(text, 0, 0);
     },
 
     renderResult(_toolCallId, params, result, theme) {
       const isError = result.isError ?? false;
       const details = result.details as { isReady?: boolean };
 
-      return {
-        type: "inline",
-        render(width) {
-          const icon = isError
-            ? theme.fg("error", "✗")
-            : theme.fg("success", "✓");
-          
-          const status = details?.isReady === false 
-            ? "processing" 
-            : details?.isReady === true 
-              ? "ready" 
-              : "";
+      const icon = isError
+        ? theme.fg("error", "✗")
+        : theme.fg("success", "✓");
+      
+      const status = details?.isReady === false 
+        ? "processing" 
+        : details?.isReady === true 
+          ? "ready" 
+          : "";
 
-          const lines = [`${icon} ${theme.fg("toolTitle", "kiro")} ${theme.fg("dim", status)}`];
+      let text = `${icon} ${theme.fg("toolTitle", "kiro")} ${theme.fg("dim", status)}`;
 
-          // Show first line of response
-          if (!isError && result.content?.[0]?.type === "text") {
-            const text = result.content[0].text.split("\n")[0] || "";
-            const preview = text.slice(0, Math.max(20, width - 20));
-            if (preview) {
-              lines.push(`   ${theme.fg("dim", preview)}`);
-            }
-          }
+      // Show first line of response
+      if (!isError && result.content?.[0]?.type === "text") {
+        const responseText = result.content[0].text.split("\n")[0] || "";
+        const preview = responseText.slice(0, 80);
+        if (preview) {
+          text += `\n   ${theme.fg("dim", preview)}`;
+        }
+      }
 
-          return lines;
-        },
-        invalidate() {},
-      };
+      return new Text(text, 0, 0);
     },
   });
 
