@@ -1,8 +1,12 @@
 /**
- * Kiro CLI Extension - Interactive integration via tmux
+ * Kiro CLI Extension - Interactive integration via tmux with isolated context
  *
  * Kiro is an AWS interactive chat tool for AI-assisted development.
  * This extension integrates with kiro-cli via tmux sessions.
+ *
+ * Context Isolation:
+ * - 'send' action: Full response enters Pi context (for collaborative work)
+ * - 'query' action: Returns compact summary, Kiro context stays isolated
  */
 
 import { spawn } from "node:child_process";
@@ -21,6 +25,7 @@ interface KiroSession {
   sessionName: string;
   createdAt: Date;
   lastActivity: Date;
+  messageCount: number;
 }
 
 interface KiroDetails {
@@ -183,6 +188,54 @@ function parseKiroOutput(output: string): { response: string; isReady: boolean }
   return { response, isReady };
 }
 
+/**
+ * Generate a compact summary of Kiro's response
+ * Used by 'query' action to provide useful info without full context
+ */
+function summarizeResponse(response: string, maxLength: number = 500): string {
+  // Remove ANSI codes if any
+  const clean = response.replace(/\x1b\[[0-9;]*m/g, "");
+  
+  // Extract key information
+  const lines = clean.split("\n").filter(l => l.trim());
+  
+  // Summarization strategies:
+  // 1. Look for specific patterns (answers, results, conclusions)
+  // 2. Take first meaningful paragraph
+  // 3. Fall back to truncated response
+  
+  // Try to find the main answer
+  for (const line of lines) {
+    // Look for lines that seem like answers (not UI elements)
+    const trimmed = line.trim();
+    if (trimmed.length > 10 && 
+        !trimmed.startsWith("╭") && 
+        !trimmed.startsWith("╰") &&
+        !trimmed.startsWith("│") &&
+        !trimmed.startsWith("─") &&
+        !trimmed.startsWith("Tip:") &&
+        !trimmed.includes("What would you like")) {
+      // Found a substantial line, use it as the summary
+      if (trimmed.length <= maxLength) {
+        return trimmed;
+      }
+      return trimmed.slice(0, maxLength - 3) + "...";
+    }
+  }
+  
+  // Fallback: combine first few meaningful lines
+  const meaningfulLines = lines.filter(l => {
+    const t = l.trim();
+    return t.length > 5 && !t.startsWith("╭") && !t.startsWith("╰") && !t.startsWith("│");
+  }).slice(0, 5);
+  
+  const summary = meaningfulLines.join(" ").trim();
+  if (summary.length <= maxLength) {
+    return summary;
+  }
+  return summary.slice(0, maxLength - 3) + "...";
+}
+
 // ---------------------------------------------------------------------------
 // Extension Registration
 // ---------------------------------------------------------------------------
@@ -197,20 +250,30 @@ export default function (pi: ExtensionAPI) {
     label: "Kiro",
     description: [
       "Interact with Kiro CLI (AWS AI assistant) via tmux session.",
-      "Kiro is started in a background tmux session for interactive use.",
-      "Commands: start, stop, send, capture, status",
-    ].join(" "),
+      "Kiro maintains isolated context in tmux, separate from Pi.",
+      "",
+      "Actions:",
+      "  send   → Full response enters Pi context (collaborative)",
+      "  query  → Compact summary only, Kiro context isolated",
+      "  start  → Start Kiro session",
+      "  stop   → Stop Kiro session", 
+      "  status → Check session status",
+    ].join("\n"),
     parameters: Type.Object({
       action: Type.Optional(Type.String({ 
-        description: "Action: send (default), start, stop, status",
+        description: "Action: send (default), query, start, stop, status",
         default: "send"
       })),
       message: Type.Optional(Type.String({ 
-        description: "Message to send to Kiro (for send action)" 
+        description: "Message to send to Kiro (for send/query actions)" 
       })),
       waitMs: Type.Optional(Type.Number({ 
         description: "Wait time in ms before capturing response (default: 5000)",
         default: 5000
+      })),
+      summaryLength: Type.Optional(Type.Number({
+        description: "Max length for query summary (default: 300)",
+        default: 300
       })),
     }),
 
@@ -218,6 +281,7 @@ export default function (pi: ExtensionAPI) {
       const action = params.action || "send";
       const message = params.message;
       const waitMs = params.waitMs || 5000;
+      const summaryLength = params.summaryLength || 300;
 
       const kiroPath = findKiroExecutable();
       if (!kiroPath) {
@@ -267,13 +331,14 @@ export default function (pi: ExtensionAPI) {
             sessionName: KIRO_SESSION_NAME,
             createdAt: new Date(),
             lastActivity: new Date(),
+            messageCount: 0,
           });
 
           return {
             content: [{
               type: "text",
               text: ready
-                ? `✅ Kiro started in tmux session '${KIRO_SESSION_NAME}'\n\nTo attach: tmux attach -t ${KIRO_SESSION_NAME}\nTo stop: kiro action=stop`
+                ? `✅ Kiro started in tmux session '${KIRO_SESSION_NAME}'\n\nContext: ISOLATED (won't pollute Pi context)\nTo attach: tmux attach -t ${KIRO_SESSION_NAME}\nTo stop: kiro action=stop`
                 : `⚠️ Kiro session created but may not be ready.\n\nTo attach: tmux attach -t ${KIRO_SESSION_NAME}`,
             }],
             details: { sessionName: KIRO_SESSION_NAME, ready },
@@ -321,6 +386,8 @@ export default function (pi: ExtensionAPI) {
               text: [
                 `✅ Kiro session '${KIRO_SESSION_NAME}' is running.`,
                 `📊 Status: ${isReady ? "Ready for input" : "Processing"}`,
+                `🔒 Context: ISOLATED`,
+                session ? `💬 Messages sent: ${session.messageCount}` : "",
                 session ? `🕐 Started: ${session.createdAt.toISOString()}` : "",
                 "",
                 "To attach: tmux attach -t " + KIRO_SESSION_NAME,
@@ -330,8 +397,76 @@ export default function (pi: ExtensionAPI) {
           };
         }
 
+        case "query": {
+          // QUERY: Send message, return only compact summary
+          // Kiro context stays isolated, minimal info enters Pi
+          
+          if (!message) {
+            return {
+              content: [{
+                type: "text",
+                text: "ℹ️ No message provided. Use: kiro action=query message=\"your question\"",
+              }],
+              isError: true,
+            };
+          }
+
+          // Ensure session exists
+          if (!(await tmuxSessionExists(KIRO_SESSION_NAME))) {
+            await createKiroSession(KIRO_SESSION_NAME);
+            await waitForKiroReady(KIRO_SESSION_NAME, 10000);
+            
+            sessions.set(KIRO_SESSION_NAME, {
+              sessionName: KIRO_SESSION_NAME,
+              createdAt: new Date(),
+              lastActivity: new Date(),
+              messageCount: 0,
+            });
+          }
+
+          // Check for abort
+          if (signal?.aborted) {
+            return {
+              content: [{ type: "text", text: "⚠️ Operation cancelled." }],
+              details: { cancelled: true },
+            };
+          }
+
+          // Send message to Kiro
+          await sendToKiro(KIRO_SESSION_NAME, message);
+
+          // Wait and capture response
+          const output = await captureKiroOutput(KIRO_SESSION_NAME, waitMs);
+          const { response } = parseKiroOutput(output);
+
+          // Generate compact summary (this is what enters Pi context)
+          const summary = summarizeResponse(response, summaryLength);
+
+          // Update session
+          const session = sessions.get(KIRO_SESSION_NAME);
+          if (session) {
+            session.lastActivity = new Date();
+            session.messageCount++;
+          }
+
+          return {
+            content: [{
+              type: "text",
+              text: `📝 ${summary}`,
+            }],
+            details: {
+              sessionName: KIRO_SESSION_NAME,
+              action: "query",
+              fullResponseLength: response.length,
+              summaryLength: summary.length,
+            },
+          };
+        }
+
         case "send":
         default: {
+          // SEND: Full response enters Pi context
+          
           if (!message) {
             return {
               content: [{
@@ -351,6 +486,7 @@ export default function (pi: ExtensionAPI) {
               sessionName: KIRO_SESSION_NAME,
               createdAt: new Date(),
               lastActivity: new Date(),
+              messageCount: 0,
             });
           }
 
@@ -373,6 +509,7 @@ export default function (pi: ExtensionAPI) {
           const session = sessions.get(KIRO_SESSION_NAME);
           if (session) {
             session.lastActivity = new Date();
+            session.messageCount++;
           }
 
           return {
@@ -394,11 +531,12 @@ export default function (pi: ExtensionAPI) {
       const action = params.action || "send";
       const message = params.message;
 
-      if (action === "send" && message) {
-        const preview = message.length > 60 ? `${message.slice(0, 60)}...` : message;
+      if ((action === "send" || action === "query") && message) {
+        const preview = message.length > 50 ? `${message.slice(0, 50)}...` : message;
+        const actionLabel = action === "query" ? "query [isolated]" : "send";
         const text = theme.fg("accent", "⚡") + " " + 
           theme.fg("toolTitle", "kiro") + " " + 
-          theme.fg("dim", "[tmux]") + "\n" +
+          theme.fg("dim", `[${actionLabel}]`) + "\n" +
           "   " + theme.fg("muted", preview);
         return new Text(text, 0, 0);
       }
@@ -411,24 +549,25 @@ export default function (pi: ExtensionAPI) {
 
     renderResult(_toolCallId, params, result, theme) {
       const isError = result.isError ?? false;
-      const details = result.details as { isReady?: boolean };
+      const details = result.details as { isReady?: boolean; action?: string };
 
       const icon = isError
         ? theme.fg("error", "✗")
         : theme.fg("success", "✓");
       
-      const status = details?.isReady === false 
-        ? "processing" 
-        : details?.isReady === true 
-          ? "ready" 
+      const action = details?.action || params.action || "send";
+      const statusBadge = action === "query" 
+        ? theme.fg("dim", "isolated")
+        : action === "send" 
+          ? theme.fg("dim", "full")
           : "";
 
-      let text = `${icon} ${theme.fg("toolTitle", "kiro")} ${theme.fg("dim", status)}`;
+      let text = `${icon} ${theme.fg("toolTitle", "kiro")} ${statusBadge}`;
 
       // Show first line of response
       if (!isError && result.content?.[0]?.type === "text") {
         const responseText = result.content[0].text.split("\n")[0] || "";
-        const preview = responseText.slice(0, 80);
+        const preview = responseText.slice(0, 70);
         if (preview) {
           text += `\n   ${theme.fg("dim", preview)}`;
         }
@@ -443,10 +582,9 @@ export default function (pi: ExtensionAPI) {
     if (!ctx.hasUI) return;
 
     pi.registerCommand?.("kiro-start", {
-      description: "Start Kiro in a tmux session",
+      description: "Start Kiro in a tmux session (isolated context)",
       handler: async (_args, cmdCtx) => {
-        cmdCtx.ui.notify?.("Starting Kiro...", "info");
-        // The tool will handle it
+        cmdCtx.ui.notify?.("Starting Kiro (isolated context)...", "info");
       },
     });
 
@@ -470,10 +608,11 @@ export default function (pi: ExtensionAPI) {
     });
   });
 
-  // Cleanup on session end
+  // Cleanup on session end (optional - keep session running)
   pi.on("session_end", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    // Optionally keep session running or kill it
+    // Session persists across Pi sessions for context continuity
+    // Uncomment to kill on Pi session end:
     // await killKiroSession(KIRO_SESSION_NAME);
   });
 }
