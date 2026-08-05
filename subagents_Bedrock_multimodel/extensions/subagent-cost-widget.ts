@@ -214,8 +214,11 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 					const agentName = agent.agent.slice(0, agentColWidth - 1);
 					const colAgent = safePadEnd(theme.fg("toolTitle", agentName), agentColWidth);
 					
-					// Format model name - extract last part after /
-					const modelDisplay = agent.model ? agent.model.split("/").pop() || agent.model : "-";
+					// Format model name - extract last part after /, simplify Anthropic models
+					let modelDisplay = agent.model || "-";
+					modelDisplay = modelDisplay.split("/").pop() || modelDisplay;
+					// Simplify Anthropic model names: remove 'us.anthropic.' prefix
+					modelDisplay = modelDisplay.replace(/^us\.anthropic\./, "");
 					const modelShort = modelDisplay.slice(0, modelColWidth - 1);
 					const colModel = safePadEnd(theme.fg("accent", modelShort), modelColWidth);
 					
