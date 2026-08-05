@@ -19,6 +19,7 @@ import { discoverAgents, type AgentScope } from "./subagent/agents.ts";
 
 interface SubagentUsage {
 	agent: string;
+	model?: string;
 	invocations: number;
 	inputTokens: number;
 	outputTokens: number;
@@ -180,25 +181,27 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 				lines.push(truncateToWidth(sepLine, width));
 
 				// Calculate dynamic column widths based on available space
-				// Minimum: Agent(8) + Calls(5) + Input(6) + Output(6) + Cost(8) + spaces(4) = 37
-				const minColsWidth = 37;
+				// Now includes model column: Agent(10) + Model(14) + Calls(5) + Input(5) + Output(5) + Cost(7) = 46
+				const minColsWidth = 46;
 				const availableForCols = Math.max(minColsWidth, innerWidth - 2); // -2 for padding
 				
-				// Dynamic column sizing
-				const agentColWidth = Math.min(16, Math.max(8, Math.floor(availableForCols * 0.28)));
-				const callsColWidth = Math.max(5, Math.floor(availableForCols * 0.12));
-				const inputColWidth = Math.max(6, Math.floor(availableForCols * 0.18));
-				const outputColWidth = Math.max(6, Math.floor(availableForCols * 0.18));
-				const costColWidth = Math.max(8, Math.floor(availableForCols * 0.20));
+				// Dynamic column sizing - with model column
+				const agentColWidth = Math.min(10, Math.max(6, Math.floor(availableForCols * 0.16)));
+				const modelColWidth = Math.min(14, Math.max(8, Math.floor(availableForCols * 0.26)));
+				const callsColWidth = Math.max(5, Math.floor(availableForCols * 0.10));
+				const inputColWidth = Math.max(5, Math.floor(availableForCols * 0.13));
+				const outputColWidth = Math.max(5, Math.floor(availableForCols * 0.13));
+				const costColWidth = Math.max(6, Math.floor(availableForCols * 0.14));
 
 				// Column headers
 				const headerAgent = safePadEnd(theme.fg("muted", "Agent"), agentColWidth);
+				const headerModel = safePadEnd(theme.fg("muted", "Model"), modelColWidth);
 				const headerCalls = safePadStart(theme.fg("muted", "Calls"), callsColWidth);
-				const headerInput = safePadStart(theme.fg("muted", "Input"), inputColWidth);
-				const headerOutput = safePadStart(theme.fg("muted", "Output"), outputColWidth);
+				const headerInput = safePadStart(theme.fg("muted", "In"), inputColWidth);
+				const headerOutput = safePadStart(theme.fg("muted", "Out"), outputColWidth);
 				const headerCost = safePadStart(theme.fg("muted", "Cost"), costColWidth);
 				
-				const colHeaderContent = `${headerAgent} ${headerCalls} ${headerInput} ${headerOutput} ${headerCost}`;
+				const colHeaderContent = `${headerAgent} ${headerModel} ${headerCalls} ${headerInput} ${headerOutput} ${headerCost}`;
 				const colHeaderPadded = safePadEnd(colHeaderContent, innerWidth - 2);
 				const colHeaderLine = theme.fg("accent", "│ ") + colHeaderPadded + theme.fg("accent", " │");
 				lines.push(truncateToWidth(colHeaderLine, width));
@@ -210,12 +213,18 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 				for (const agent of sortedAgents.slice(0, maxRows)) {
 					const agentName = agent.agent.slice(0, agentColWidth - 1);
 					const colAgent = safePadEnd(theme.fg("toolTitle", agentName), agentColWidth);
+					
+					// Format model name - extract last part after /
+					const modelDisplay = agent.model ? agent.model.split("/").pop() || agent.model : "-";
+					const modelShort = modelDisplay.slice(0, modelColWidth - 1);
+					const colModel = safePadEnd(theme.fg("accent", modelShort), modelColWidth);
+					
 					const colCalls = safePadStart(theme.fg("dim", String(agent.invocations)), callsColWidth);
 					const colInput = safePadStart(theme.fg("dim", formatTokens(agent.inputTokens)), inputColWidth);
 					const colOutput = safePadStart(theme.fg("dim", formatTokens(agent.outputTokens)), outputColWidth);
 					const colCost = safePadStart(theme.fg("warning", formatCost(agent.cost)), costColWidth);
 					
-					const rowContent = `${colAgent} ${colCalls} ${colInput} ${colOutput} ${colCost}`;
+					const rowContent = `${colAgent} ${colModel} ${colCalls} ${colInput} ${colOutput} ${colCost}`;
 					const rowPadded = safePadEnd(rowContent, innerWidth - 2);
 					const rowLine = theme.fg("accent", "│ ") + rowPadded + theme.fg("accent", " │");
 					lines.push(truncateToWidth(rowLine, width));
@@ -270,6 +279,7 @@ export default function subagentCostWidgetExtension(pi: ExtensionAPI) {
 		for (const agent of discovery.agents) {
 			stats.agents.set(agent.name, {
 				agent: agent.name,
+				model: agent.model,
 				invocations: 0,
 				inputTokens: 0,
 				outputTokens: 0,
