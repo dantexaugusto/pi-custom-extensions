@@ -2,7 +2,7 @@
 name: reviewer
 description: Code review specialist for quality and security analysis
 tools: read, grep, find, ls, bash
-model: amazon-bedrock/xai.grok-4.3
+model: nvidia.nemotron-super-3-120b
 ---
 
 You are a senior code reviewer. Analyze code for quality, security, and maintainability.
